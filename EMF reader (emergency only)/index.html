@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="EMF Reader">
+  <meta name="theme-color" content="#000000">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="apple-touch-icon.svg">
+  <title>EMF Reader</title>
+  <style>
+    html, body { width:100%; height:100%; margin:0; }
+    body {
+      display:grid; place-items:center; background:#000; overflow:hidden; font-family:Arial, sans-serif;
+    }
+    body::before {
+      content:''; position:fixed; inset:0; pointer-events:none; opacity:.8;
+      background:
+        radial-gradient(circle at center, rgba(255,255,255,.05), transparent 45%),
+        linear-gradient(135deg, rgba(255,255,255,.08), transparent 45%, rgba(0,0,0,.2)),
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.4' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)' opacity='.75'/%3E%3C/svg%3E");
+      mix-blend-mode:screen;
+    }
+    body.emf4::after, body.emf5::after {
+      content:''; position:fixed; inset:0; pointer-events:none; opacity:.95;
+      background:
+        linear-gradient(90deg, rgba(255,255,255,.08), rgba(0,0,0,.2), rgba(255,255,255,.1)),
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Cfilter id='n2'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='2.2' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100' height='100' filter='url(%23n2)' opacity='.95'/%3E%3C/svg%3E");
+      animation:dist .18s infinite alternate;
+    }
+    @keyframes dist { from { transform:translate(0,0) } to { transform:translate(2px,-2px) } }
+    .device {
+      position:relative; width:min(92vw,220px); height:min(82vh,430px); min-height:360px;
+      background:linear-gradient(to bottom, #1b1b1b, #111);
+      border-radius:18px 18px 36px 36px; clip-path: polygon(10% 0%, 90% 0%, 100% 100%, 0% 100%);
+      box-shadow:0 0 28px rgba(0,0,0,.85), inset 0 0 16px rgba(255,255,255,.08);
+      overflow:hidden;
+    }
+    .gauge { position:relative; height:90px; margin:16px 10px 0; background:linear-gradient(to bottom, #fafafa, #fff 60%, #dfdfdf); clip-path: polygon(4% 18%, 96% 18%, 100% 100%, 0% 100%); }
+    .gauge-bandline { position:absolute; left:12px; right:12px; top:24px; height:38px; display:grid; grid-template-columns:repeat(5,1fr); clip-path: polygon(2% 96%, 8% 36%, 19% 16%, 35% 7%, 50% 4%, 65% 7%, 81% 16%, 92% 36%, 98% 96%); z-index:1; }
+    .band:nth-child(1){background:#00bfff}.band:nth-child(2){background:#0057ff}.band:nth-child(3){background:#00ff2a}.band:nth-child(4){background:#ff9a00}.band:nth-child(5){background:#ff0000}
+    .gauge-lights { position:absolute; left:10px; right:10px; top:12px; display:grid; grid-template-columns:repeat(5,1fr); z-index:3; }
+    .gauge-light { width:22px; height:22px; margin:0 auto; border-radius:50%; border:2px solid #000; opacity:.55; background:var(--c); box-shadow:0 0 0 1px rgba(255,255,255,.6) inset; }
+    .gauge-light.on { opacity:1; filter:brightness(1.35) saturate(1.2); box-shadow:0 0 0 1px rgba(255,255,255,.8) inset, 0 0 10px var(--c), 0 0 18px color-mix(in srgb, var(--c) 65%, white); }
+    .labels { position:absolute; left:10px; right:10px; top:54px; display:grid; grid-template-columns:repeat(5,1fr); font-size:10px; font-weight:bold; color:#111; text-align:center; z-index:4; }
+    .body-panel { position:absolute; left:50%; top:252px; transform:translateX(-50%); width:74%; height:150px; background:linear-gradient(to bottom, #202020, #0b0b0b); clip-path: polygon(30% 0%, 70% 0%, 84% 100%, 16% 100%); z-index:1; }
+    .chevrons { position:absolute; left:50%; top:200px; transform:translateX(-50%); color:#262626; font-size:14px; line-height:.9; text-align:center; letter-spacing:-1px; z-index:2; }
+    .power-btn { position:absolute; left:50%; top:126px; transform:translateX(-50%); width:108px; height:138px; border-radius:6px; background:linear-gradient(to bottom, #151515, #050505); border:2px solid rgba(255,255,255,.08); box-shadow:inset 0 0 0 1px rgba(255,255,255,.03), 0 0 12px rgba(0,0,0,.8); display:flex; align-items:center; justify-content:center; touch-action:manipulation; user-select:none; cursor:pointer; z-index:5; }
+    .power-inner { width:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; transform:translateY(2px); }
+    .power-lines { display:flex; flex-direction:column; align-items:center; gap:10px; width:100%; }
+    .power-line { width:22%; height:3px; background:#8a8a8a; border-radius:999px; transform:skewY(-8deg); }
+    .power-state { margin-top:10px; color:#777; font-size:10px; letter-spacing:1px; }
+    .power-btn.active .power-state { color:#222; }
+    .test-menu { position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,.75); z-index:999; }
+    .test-menu.open { display:flex; }
+    .test-panel { width:min(90vw,320px); background:#111; color:#fff; border:1px solid rgba(255,255,255,.15); border-radius:12px; padding:16px; }
+    .test-panel h2 { margin:0 0 12px; font-size:16px; }
+    .test-levels { display:grid; grid-template-columns:repeat(5,1fr); gap:8px; }
+    .test-levels button, .test-close { border:0; border-radius:8px; padding:10px 0; background:#2a2a2a; color:#fff; font:inherit; min-height:44px; }
+    .test-close { margin-top:12px; width:100%; background:#444; }
+    .sound-test { margin-top:12px; width:100%; background:#0a6; }
+    @media (max-width:480px) { .gauge { height:82px; margin:18px 8px 0; } .gauge-light { width:20px; height:20px; } .power-btn { width:96px; height:122px; top:100px; } .body-panel { top:238px; height:136px; } .chevrons { top:192px; } }
+  </style>
+</head>
+<body>
+  <div class="device" id="device">
+    <div class="gauge">
+      <div class="gauge-bandline"><div class="band"></div><div class="band"></div><div class="band"></div><div class="band"></div><div class="band"></div></div>
+      <div class="gauge-lights">
+        <div class="gauge-light" id="light1" style="--c:#00bfff"></div>
+        <div class="gauge-light" id="light2" style="--c:#0057ff"></div>
+        <div class="gauge-light" id="light3" style="--c:#00ff2a"></div>
+        <div class="gauge-light" id="light4" style="--c:#ff9a00"></div>
+        <div class="gauge-light" id="light5" style="--c:#ff0000"></div>
+      </div>
+      <div class="labels"><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span></div>
+    </div>
+    <div class="chevrons">︿<br>︿<br>︿</div>
+    <div class="body-panel"></div>
+    <div class="power-btn" id="powerBtn" aria-label="Power on/off"><div class="power-inner"><div class="power-lines"><div class="power-line"></div><div class="power-line"></div><div class="power-line"></div></div><div class="power-state" id="powerBtnText">UIT</div></div></div>
+  </div>
+  <div class="test-menu" id="testMenu" aria-hidden="true"><div class="test-panel"><h2>EMF Test Menu</h2><div class="test-levels"><button type="button" data-level="1">1</button><button type="button" data-level="2">2</button><button type="button" data-level="3">3</button><button type="button" data-level="4">4</button><button type="button" data-level="5">5</button></div><button class="sound-test" type="button" id="soundTest">Sound test</button><button class="test-close" type="button" id="testClose">Close</button></div></div>
+  <script>
+    const lights = [...Array(5)].map((_, i) => document.getElementById(`light${i+1}`));
+    const powerBtn = document.getElementById('powerBtn');
+    const powerBtnText = document.getElementById('powerBtnText');
+    const device = document.getElementById('device');
+    const testMenu = document.getElementById('testMenu');
+    const testClose = document.getElementById('testClose');
+    const soundTest = document.getElementById('soundTest');
+    let poweredOn = false, currentEmfLevel = 1, lastEmfChange = 0, intervalId = null, vibrateId = null;
+    let audioCtx = null, audioCompressor = null, toneOsc = null, toneGain = null, toneLevel = null, keyBuffer = '';
+    function unlockAudio(){
+      if(!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        audioCompressor = audioCtx.createDynamicsCompressor();
+        audioCompressor.threshold.value = -30;
+        audioCompressor.knee.value = 30;
+        audioCompressor.ratio.value = 12;
+        audioCompressor.attack.value = 0.003;
+        audioCompressor.release.value = 0.25;
+        audioCompressor.connect(audioCtx.destination);
+      }
+      if(audioCtx.state==='suspended') audioCtx.resume().catch(()=>{});
+    }
+    function stopTone(){ if(toneOsc){ try{toneOsc.stop();}catch{} toneOsc.disconnect(); } if(toneGain) toneGain.disconnect(); toneOsc=null; toneGain=null; toneLevel=null; }
+    function startTone(level){ unlockAudio(); stopTone(); const p=[{f:220,t:'sine'},{f:294,t:'triangle'},{f:370,t:'square'},{f:494,t:'sawtooth'},{f:659,t:'square'}][level-1]||{f:220,t:'sine'}; toneOsc=audioCtx.createOscillator(); toneGain=audioCtx.createGain(); toneOsc.type=p.t; toneOsc.frequency.value=p.f; toneGain.gain.setValueAtTime(0.001,audioCtx.currentTime); toneGain.gain.exponentialRampToValueAtTime(0.95,audioCtx.currentTime+0.04); toneOsc.connect(toneGain).connect(audioCompressor); toneOsc.start(); toneLevel=level; }
+    function updateTone(level){ if(level<=1){ stopTone(); return; } if(toneLevel!==level) startTone(level); }
+    function stopVibration(){ if(vibrateId) clearInterval(vibrateId); vibrateId=null; device.style.transform=''; }
+    function startVibration(){ if(vibrateId) return; vibrateId=setInterval(()=>{ device.style.transform=`translate(${(Math.random()-0.5)*2}px, ${(Math.random()-0.5)*2}px)`; setTimeout(()=>{ if(poweredOn && currentEmfLevel>=4) device.style.transform=''; },80); },120); }
+    function applyLevel(level){ for(let i=0;i<lights.length;i++) lights[i].classList.toggle('on', i<level); document.body.classList.toggle('emf4', level>=4); document.body.classList.toggle('emf5', level===5); if(level>=4) startVibration(); else stopVibration(); updateTone(level); }
+    function chooseLevel(){ const r=Math.random(); if(r<0.03) return 5; if(r<0.13) return 4; if(r<0.48) return 3; if(r<0.73) return 2; return 1; }
+    function updateLights(force=false){ if(!poweredOn){ lights.forEach(l=>l.classList.remove('on')); document.body.classList.remove('emf4','emf5'); stopVibration(); stopTone(); return; } const now=Date.now(); if(force){ currentEmfLevel=1; lastEmfChange=now; applyLevel(1); return; } if(now-lastEmfChange>=60000){ currentEmfLevel=chooseLevel(); lastEmfChange=now; } applyLevel(currentEmfLevel); }
+    function togglePower(){ unlockAudio(); poweredOn=!poweredOn; powerBtn.classList.toggle('active',poweredOn); powerBtnText.textContent=poweredOn?'ON':'UIT'; if(intervalId){ clearInterval(intervalId); intervalId=null; } if(poweredOn){ currentEmfLevel=1; lastEmfChange=0; updateLights(true); intervalId=setInterval(updateLights,2500); } else { updateLights(); } }
+    function openTestMenu(){ testMenu.classList.add('open'); testMenu.setAttribute('aria-hidden','false'); }
+    function closeTestMenu(){ testMenu.classList.remove('open'); testMenu.setAttribute('aria-hidden','true'); }
+    function setTestLevel(level){ unlockAudio(); poweredOn=true; powerBtn.classList.add('active'); powerBtnText.textContent='ON'; if(intervalId){ clearInterval(intervalId); intervalId=null; } currentEmfLevel=level; lastEmfChange=Date.now(); applyLevel(level); }
+    powerBtn.addEventListener('pointerup', e=>{ e.preventDefault(); togglePower(); });
+    powerBtn.addEventListener('touchstart', unlockAudio, { passive:true });
+    document.body.addEventListener('touchstart', unlockAudio, { passive:true });
+    document.addEventListener('keydown', e=>{ if(e.target && ['INPUT','TEXTAREA'].includes(e.target.tagName)) return; unlockAudio(); keyBuffer=(keyBuffer+e.key).slice(-3); if(keyBuffer==='444'){ openTestMenu(); keyBuffer=''; } if(e.key==='Escape') closeTestMenu(); });
+    testMenu.addEventListener('click', e=>{ const btn=e.target.closest('[data-level]'); if(btn){ setTestLevel(Number(btn.dataset.level)); closeTestMenu(); } });
+    testClose.addEventListener('click', closeTestMenu);
+    soundTest.addEventListener('click', ()=>{ unlockAudio(); [0,1,2,3,4].forEach((i, idx)=> setTimeout(()=> startTone(i+1), idx * 250)); });
+    updateLights();
+  </script>
+</body>
+</html>
